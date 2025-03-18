@@ -74,6 +74,12 @@ struct UncloudApp: App {
                         setupCleanupTimer()
                         setupUsageManager()
                         
+                        // Set the model context for AuthManager
+                        authManager.setModelContext(sharedModelContainer.mainContext)
+                        
+                        // Enable Pro features for development account
+                        authManager.enableProForEmail(email: "bumpinace@gmail.com")
+                        
                         // Ensure Hugging Face service is initialized with default API key
                         huggingFaceService.useDefaultAPIKey()
                         
@@ -216,6 +222,76 @@ class AuthManager: ObservableObject {
     
     private let authService = AuthService()
     private var cancellables = Set<AnyCancellable>()
+    private var modelContext: ModelContext?
+    
+    // Developer emails that should automatically get Pro access
+    private let developerEmails = ["bumpinace@gmail.com"]
+    
+    // Set the model context for SwiftData operations
+    func setModelContext(_ context: ModelContext) {
+        self.modelContext = context
+    }
+    
+    // Enable Pro features for the current user
+    func enableProFeatures() {
+        self.isPro = true
+        
+        // If we have a user model, update it too
+        if let userId = currentUserId {
+            updateUserProStatus(userId: userId, isPro: true)
+        }
+    }
+    
+    // Check if a specific developer email is in the database and enable Pro for it
+    func enableProForEmail(email: String) {
+        guard let modelContext = self.modelContext else { return }
+        
+        // Find user with matching email
+        let descriptor = FetchDescriptor<User>(predicate: #Predicate<User> { user in
+            user.email == email
+        })
+        
+        do {
+            let users = try modelContext.fetch(descriptor)
+            if let user = users.first {
+                // Update user model
+                user.isPro = true
+                user.proExpirationDate = Date().addingTimeInterval(60*60*24*365) // 1 year from now
+                try modelContext.save()
+                
+                // Also update local state if this is the current user
+                if user.id == currentUserId {
+                    self.isPro = true
+                }
+                
+                print("Pro features enabled for \(email)")
+            } else {
+                print("No user found with email: \(email)")
+            }
+        } catch {
+            print("Error enabling Pro for email: \(error)")
+        }
+    }
+    
+    // Update Pro status in the user model
+    private func updateUserProStatus(userId: String, isPro: Bool) {
+        guard let modelContext = self.modelContext else { return }
+        
+        let descriptor = FetchDescriptor<User>(predicate: #Predicate<User> { user in
+            user.id == userId
+        })
+        
+        do {
+            let users = try modelContext.fetch(descriptor)
+            if let user = users.first {
+                user.isPro = isPro
+                user.proExpirationDate = isPro ? Date().addingTimeInterval(60*60*24*365) : nil // 1 year from now
+                try modelContext.save()
+            }
+        } catch {
+            print("Error updating user Pro status: \(error)")
+        }
+    }
     
     // Sign in anonymously
     func signInAnonymously() {
@@ -259,6 +335,12 @@ class AuthManager: ObservableObject {
                     self?.isAuthenticated = true
                     self?.isAnonymous = false
                     self?.currentUserId = userId
+                    
+                    // Check if this is a developer email that should get Pro access
+                    if let self = self, self.developerEmails.contains(email.lowercased()) {
+                        self.isPro = true
+                    }
+                    
                     DispatchQueue.main.async {
                         completion(true)
                     }
@@ -287,6 +369,12 @@ class AuthManager: ObservableObject {
                     self?.isAuthenticated = true
                     self?.isAnonymous = false
                     self?.currentUserId = userId
+                    
+                    // Check if this is a developer email that should get Pro access
+                    if let self = self, self.developerEmails.contains(email.lowercased()) {
+                        self.isPro = true
+                    }
+                    
                     DispatchQueue.main.async {
                         completion(true)
                     }
