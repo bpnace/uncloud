@@ -52,6 +52,7 @@ struct UncloudApp: App {
     @StateObject private var themeManager = ThemeManager()
     @StateObject private var subscriptionManager = SubscriptionManager()
     @StateObject private var usageManager = UsageManager()
+    @StateObject private var notificationDelegate = NotificationDelegate()
     
     // Setup cleanup timer for anonymous data
     @State private var cleanupTimer: Timer? = nil
@@ -67,6 +68,7 @@ struct UncloudApp: App {
                     .environmentObject(themeManager)
                     .environmentObject(subscriptionManager)
                     .environmentObject(usageManager)
+                    .environmentObject(notificationDelegate)
                     .onAppear {
                         setupDataManager()
                         setupCleanupTimer()
@@ -77,6 +79,9 @@ struct UncloudApp: App {
                         
                         // Create AppSettings with default Hugging Face configuration if none exists
                         ensureAppSettingsExist()
+                        
+                        // Register for notifications
+                        UNUserNotificationCenter.current().delegate = notificationDelegate
                     }
                     .onChange(of: authManager.isAuthenticated) { _, newValue in
                         // Update DataManager with authentication status
@@ -97,6 +102,12 @@ struct UncloudApp: App {
                     .onChange(of: authManager.isPro) { _, _ in
                         // Update tier when pro status changes
                         updateUsageManagerTier()
+                    }
+                    .onChange(of: notificationDelegate.deepLinkDestination) { _, destination in
+                        if let destination = destination {
+                            handleDeepLink(destination)
+                            notificationDelegate.resetDeepLink()
+                        }
                     }
                 
                 // Show splash screen if needed
@@ -172,6 +183,26 @@ struct UncloudApp: App {
             }
         } catch {
             print("Error ensuring AppSettings exist: \(error)")
+        }
+    }
+    
+    private func handleDeepLink(_ destination: NotificationDelegate.DeepLinkDestination) {
+        // Implement app-specific navigation based on the deep link destination
+        switch destination {
+        case .journal(let createNew):
+            // Navigate to journal tab and create new entry if requested
+            NotificationCenter.default.post(
+                name: Notification.Name("NavigateToJournal"),
+                object: nil,
+                userInfo: ["createNew": createNew]
+            )
+            
+        case .thought:
+            // Navigate to thought capture tab
+            NotificationCenter.default.post(
+                name: Notification.Name("NavigateToThought"),
+                object: nil
+            )
         }
     }
 }

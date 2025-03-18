@@ -7,8 +7,15 @@ struct JournalView: View {
     @Query private var journalEntries: [JournalEntry]
     
     @State private var showingNewEntry = false
+    @State private var showingSubscriptionPrompt = false
     @State private var selectedTag: String?
     @State private var searchText = ""
+    @State private var viewMode: ViewMode = .list
+    
+    enum ViewMode {
+        case list
+        case calendar
+    }
     
     var filteredEntries: [JournalEntry] {
         let userEntries = journalEntries.filter { $0.userId == authManager.currentUserId }
@@ -46,61 +53,118 @@ struct JournalView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
+            VStack(spacing: 0) {
+                // Pro feature gate
                 if !authManager.isPro {
-                    ProUpsellBanner()
+                    ProSubscriptionBanner(showSubscription: $showingSubscriptionPrompt)
                 }
                 
-                if journalEntries.isEmpty {
-                    EmptyJournalView()
-                } else {
-                    List {
-                        if !availableTags.isEmpty {
-                            TagFilterSection(
-                                availableTags: availableTags,
-                                selectedTag: $selectedTag
-                            )
-                        }
+                // View mode picker (only for Pro users)
+                if authManager.isPro {
+                    Picker("View Mode", selection: $viewMode) {
+                        Label("List", systemImage: "list.bullet")
+                            .tag(ViewMode.list)
                         
-                        ForEach(filteredEntries) { entry in
-                            NavigationLink {
-                                Text("Journal Entry Detail - Coming Soon")
-                            } label: {
-                                JournalEntryRow(entry: entry)
-                            }
-                        }
-                        .onDelete(perform: deleteEntries)
+                        Label("Calendar", systemImage: "calendar")
+                            .tag(ViewMode.calendar)
                     }
-                    .searchable(text: $searchText, prompt: "Search journals")
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding([.horizontal, .top])
+                }
+                
+                // Journal content
+                if authManager.isPro {
+                    // Full journal functionality for Pro users
+                    if viewMode == .list {
+                        // List view
+                        if journalEntries.isEmpty || filteredEntries.isEmpty {
+                            EmptyJournalView(showNewEntry: $showingNewEntry)
+                        } else {
+                            List {
+                                if !availableTags.isEmpty {
+                                    TagFilterSection(
+                                        availableTags: availableTags,
+                                        selectedTag: $selectedTag
+                                    )
+                                }
+                                
+                                ForEach(filteredEntries) { entry in
+                                    NavigationLink {
+                                        JournalEntryDetailView(entry: entry)
+                                    } label: {
+                                        JournalEntryRow(entry: entry)
+                                    }
+                                }
+                                .onDelete(perform: deleteEntries)
+                            }
+                            .listStyle(.insetGrouped)
+                            .searchable(text: $searchText, prompt: "Search journals")
+                        }
+                    } else {
+                        // Calendar view
+                        JournalCalendarView()
+                            .environmentObject(authManager)
+                    }
+                } else {
+                    // Limited preview for non-Pro users (blurred/locked entries)
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            // Show a couple of sample entries for preview
+                            ForEach(0..<3, id: \.self) { index in
+                                LockedJournalPreview(index: index)
+                            }
+                            
+                            // Unlock banner
+                            Button(action: {
+                                showingSubscriptionPrompt = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "lock.open.fill")
+                                    Text("Unlock Premium Journal")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                }
+                                .padding()
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [Color.purple, Color.blue]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                        }
+                        .padding(.vertical)
+                    }
                 }
             }
             .navigationTitle("Journal")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        showingNewEntry = true
+                        if authManager.isPro {
+                            showingNewEntry = true
+                        } else {
+                            showingSubscriptionPrompt = true
+                        }
                     }) {
                         Label("New Entry", systemImage: "plus")
                     }
                 }
             }
             .sheet(isPresented: $showingNewEntry) {
-                Text("New Journal Entry View - Coming Soon")
-                    .padding()
+                JournalEntryCreationView()
             }
-        }
-        .onAppear {
-            // For demo purposes, create a sample entry if none exist
-            if journalEntries.isEmpty && authManager.currentUserId != nil {
-                let sampleEntry = JournalEntry(
-                    title: "My First Journal Entry",
-                    content: "Today I started using the journaling feature in Uncloud. I'm looking forward to tracking my progress and seeing how my thoughts evolve over time.",
-                    tags: ["Welcome", "First"],
-                    mood: "Hopeful",
-                    userId: authManager.currentUserId ?? ""
-                )
-                modelContext.insert(sampleEntry)
-                try? modelContext.save()
+            .sheet(isPresented: $showingSubscriptionPrompt) {
+                VStack {
+                    // This would be replaced with your actual SubscriptionView
+                    Text("Subscription View - Coming Soon")
+                        .padding()
+                }
             }
         }
     }
@@ -113,37 +177,46 @@ struct JournalView: View {
     }
 }
 
-// Helper Views
-struct ProUpsellBanner: View {
+// MARK: - Supporting Views
+
+struct ProSubscriptionBanner: View {
+    @Binding var showSubscription: Bool
+    
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: "star.fill")
                     .foregroundColor(.yellow)
-                Text("Pro Feature")
+                Text("Premium Feature")
                     .font(.headline)
+                    .fontWeight(.bold)
                 Spacer()
                 Button("Upgrade") {
-                    // Will implement upgrade flow later
+                    showSubscription = true
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
             }
             
-            Text("Get unlimited journal entries, mood tracking, and AI insights with Pro.")
+            Text("The Journal is a Premium feature. Upgrade to track your moods, get AI insights, and build self-awareness over time.")
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .padding(.bottom, 4)
         }
         .padding()
         .background(Color.yellow.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .padding(.horizontal)
+        .padding([.horizontal, .top])
     }
 }
 
 struct EmptyJournalView: View {
+    @Binding var showNewEntry: Bool
+    
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
+            Spacer()
+            
             Image(systemName: "book.closed")
                 .font(.system(size: 70))
                 .foregroundColor(.blue.opacity(0.7))
@@ -157,15 +230,96 @@ struct EmptyJournalView: View {
                 .foregroundColor(.secondary)
                 .padding(.horizontal, 40)
             
-            Button("Create First Entry") {
-                // Will be connected to new entry sheet
+            Button(action: {
+                showNewEntry = true
+            }) {
+                Text("Create First Entry")
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
             }
-            .buttonStyle(.borderedProminent)
-            .padding(.top)
+            .padding(.top, 8)
+            
+            Spacer()
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+    }
+}
+
+struct LockedJournalPreview: View {
+    let index: Int
+    
+    // Sample data for preview entries
+    private let sampleTitles = [
+        "Morning Reflection",
+        "Weekend Thoughts",
+        "Progress Note"
+    ]
+    
+    private let sampleDates = [
+        Date(),
+        Date().addingTimeInterval(-86400),
+        Date().addingTimeInterval(-172800)
+    ]
+    
+    private let sampleMoods = [
+        "Great",
+        "Good",
+        "Neutral"
+    ]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with date and lock icon
+            HStack {
+                Text(formattedDate)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Image(systemName: "lock.fill")
+                    .foregroundColor(.secondary)
+            }
+            
+            // Title
+            Text(sampleTitles[safe: index] ?? "Journal Entry")
+                .font(.headline)
+            
+            // Blurred content
+            Text("This is a premium journal entry. Upgrade to Pro to create and view entries...")
+                .lineLimit(2)
+                .blur(radius: 3)
+                .overlay(
+                    Rectangle()
+                        .fill(Color(.systemBackground).opacity(0.4))
+                )
+            
+            // Tags and mood preview
+            HStack {
+                Text(sampleMoods[safe: index] ?? "Mood")
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Capsule())
+                
+                Spacer()
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
+        .padding(.horizontal)
+    }
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: sampleDates[safe: index] ?? Date())
     }
 }
 
@@ -218,8 +372,22 @@ struct JournalEntryRow: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(entry.title)
-                .font(.headline)
+            HStack {
+                if entry.isFavorite {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.yellow)
+                        .font(.caption)
+                }
+                
+                Text(entry.title)
+                    .font(.headline)
+                
+                Spacer()
+                
+                Text(formattedDate)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
             Text(entry.content)
                 .font(.subheadline)
@@ -238,12 +406,28 @@ struct JournalEntryRow: View {
                 
                 Spacer()
                 
-                Text(entry.createdAt, style: .date)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if let tags = entry.tags, !tags.isEmpty {
+                    Text("\(tags.count) tag\(tags.count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
         .padding(.vertical, 4)
+    }
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: entry.createdAt)
+    }
+}
+
+// Array safe index extension
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
 }
 
@@ -251,6 +435,5 @@ struct JournalEntryRow: View {
 #Preview {
     JournalView()
         .environmentObject(AuthManager())
-        .environmentObject(UsageManager())
         .modelContainer(for: JournalEntry.self, inMemory: true)
 } 

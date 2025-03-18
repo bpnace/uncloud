@@ -133,9 +133,30 @@ For WidgetKit to work properly:
   - [x] Consistent design across onboarding and main views
   - [x] Enhanced settings view with account management options
   - [x] Animated splash screen on app launch
-- [ ] Journaling features
-- [ ] Notifications and reminders
+  - [x] Redesigned limit reached view with animations
+- [x] Journaling features
+  - [x] Journal entry creation and management
+  - [x] Mood tracking for entries
+  - [x] Tag system for categorization
+  - [x] Calendar view for entry history
+- [x] Notifications and reminders
+  - [x] Daily journaling reminders
+  - [x] Custom notification scheduling
+  - [x] Notification permission handling
+  - [x] Deep linking from notifications
 - [ ] Analytics and performance monitoring
+  - [ ] Basic usage analytics
+  - [ ] Error tracking
+  - [ ] Performance metrics
+
+## Next Steps
+
+### Analytics and Performance Monitoring
+
+1. Set up basic usage analytics tracking
+2. Implement error tracking and reporting
+3. Add performance metrics to monitor app responsiveness
+4. Create admin dashboard for analytics visualization
 
 ## Contributing
 
