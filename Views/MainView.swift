@@ -1,11 +1,24 @@
 import SwiftUI
 
+enum Tab {
+    case home
+    case journal
+    case profile
+    case settings
+}
+
 struct MainView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
     @EnvironmentObject var usageManager: UsageManager
-    @State private var selectedTab: Int = 0
+    @State private var selectedTab: Tab = .home
+    @EnvironmentObject private var notificationDelegate: NotificationDelegate
+    @State private var showJournalCreation = false
+    
+    // Listen for deep link navigation
+    private let journalNotification = NotificationCenter.default.publisher(for: Notification.Name("NavigateToJournal"))
+    private let thoughtNotification = NotificationCenter.default.publisher(for: Notification.Name("NavigateToThought"))
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -14,7 +27,7 @@ struct MainView: View {
                 .tabItem {
                     Label("Thoughts", systemImage: "brain")
                 }
-                .tag(0)
+                .tag(Tab.home)
             
             // Journal Tab - Only for Pro users
             if authManager.isPro {
@@ -22,7 +35,7 @@ struct MainView: View {
                     .tabItem {
                         Label("Journal", systemImage: "book")
                     }
-                    .tag(1)
+                    .tag(Tab.journal)
             }
             
             // Profile Tab - For all registered (non-anonymous) users
@@ -31,7 +44,7 @@ struct MainView: View {
                     .tabItem {
                         Label("Profile", systemImage: "person")
                     }
-                    .tag(authManager.isPro ? 2 : 1)
+                    .tag(Tab.profile)
             }
             
             // Settings Tab - Available to all users
@@ -39,7 +52,27 @@ struct MainView: View {
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
-                .tag(getSettingsTabTag())
+                .tag(Tab.settings)
+        }
+        .onReceive(journalNotification) { notification in
+            // Navigate to journal tab
+            selectedTab = .journal
+            
+            // If createNew is true, trigger the journal creation sheet
+            if let userInfo = notification.userInfo, 
+               let createNew = userInfo["createNew"] as? Bool, 
+               createNew {
+                showJournalCreation = true
+            }
+        }
+        .onReceive(thoughtNotification) { _ in
+            // Navigate to home tab (thought capture)
+            selectedTab = .home
+        }
+        .sheet(isPresented: $showJournalCreation) {
+            if authManager.isPro {
+                JournalEntryCreationView()
+            }
         }
     }
     

@@ -15,6 +15,7 @@ struct ThoughtCaptureView: View {
     @FocusState private var isReplyFieldFocused: Bool
     @State private var scrollOffset: CGFloat = 0
     @State private var scrollViewHeight: CGFloat = 0
+    @State private var showLimitOverlay = true  // Control visibility of limit overlay
     
     // Create a scroll view reader to track scroll position
     @Namespace private var scrollNamespace
@@ -393,15 +394,22 @@ struct ThoughtCaptureView: View {
             .overlay(
                 Group {
                     // Show limit overlay when user has reached their limit
-                    if viewModel.limitReached || usageManager.limitReached {
-                        LimitReachedView(onLoginTapped: {
-                            if authManager.isAnonymous {
-                                showSignInSheet = true
-                            } else if !authManager.isPro {
-                                // Show subscription view
-                                // This will be implemented when we add subscription view navigation
+                    if (viewModel.limitReached || usageManager.limitReached) && showLimitOverlay {
+                        LimitReachedView(
+                            onLoginTapped: {
+                                if authManager.isAnonymous {
+                                    showSignInSheet = true
+                                } else if !authManager.isPro {
+                                    // Show subscription view when implemented
+                                }
+                                showLimitOverlay = false // Hide overlay after action
+                            },
+                            onDismissTapped: {
+                                showLimitOverlay = false // Hide overlay when dismissed
                             }
-                        })
+                        )
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        .zIndex(10) // Ensure overlay appears above other content
                     }
                 }
             )
@@ -425,6 +433,21 @@ struct ThoughtCaptureView: View {
                 
                 // Reinitialize to load API key
                 viewModel.loadAPIKeyFromSettings()
+                
+                // Reset limit overlay visibility
+                if viewModel.limitReached || usageManager.limitReached {
+                    showLimitOverlay = true
+                }
+            }
+            .onChange(of: viewModel.limitReached) { _, newValue in
+                if newValue {
+                    showLimitOverlay = true
+                }
+            }
+            .onChange(of: usageManager.limitReached) { _, newValue in
+                if newValue {
+                    showLimitOverlay = true
+                }
             }
             .onChange(of: viewModel.isProcessing) { _, newValue in
                 // When processing completes, check if we should show reply options

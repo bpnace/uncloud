@@ -6,7 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var usageManager: UsageManager
     
-    @Binding var selectedTab: Int
+    @Binding var selectedTab: Tab
     
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -70,7 +70,7 @@ struct SettingsView: View {
     }
     
     // Initializer with default parameter for previews
-    init(selectedTab: Binding<Int> = .constant(0)) {
+    init(selectedTab: Binding<Tab> = .constant(.settings)) {
         self._selectedTab = selectedTab
     }
     
@@ -226,7 +226,19 @@ struct SettingsView: View {
                 .opacity(authManager.isAnonymous ? 0.6 : 1)
                 
                 Section(header: SettingSectionHeader(title: "Privacy", requiresAccount: authManager.isAnonymous)) {
-                    Toggle("Enable Notifications", isOn: $notificationsEnabled)
+                    NavigationLink {
+                        NotificationSettingsView()
+                    } label: {
+                        HStack {
+                            Text("Notification Settings")
+                            if authManager.isPro {
+                                Spacer()
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.yellow)
+                                    .font(.caption)
+                            }
+                        }
+                    }
                     
                     Toggle("Privacy Mode (Offline Only)", isOn: $privacyModeEnabled)
                     
