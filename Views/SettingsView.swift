@@ -106,16 +106,10 @@ struct SettingsView: View {
                         }
                     } else {
                         // Not logged in
-                        Button("Sign In") {
+                        Button("Sign In / Create Account") {
                             showSignInSheet = true
                         }
                         .foregroundColor(.blue)
-                        
-                        Button("Continue as Guest") {
-                            // This will simply dismiss and go back to ThoughtCaptureView
-                            // No action needed as the user is already in guest mode
-                        }
-                        .foregroundColor(.secondary)
                     }
                 }
                 
@@ -127,6 +121,27 @@ struct SettingsView: View {
                                 .foregroundColor(.orange)
                             Text("Create an account to access all settings")
                                 .foregroundColor(.primary)
+                        }
+                    }
+                }
+                
+                // Developer settings section
+                if let email = authManager.currentUserId?.contains("@") == true ? authManager.currentUserId : nil,
+                   ["bumpinace@gmail.com"].contains(email.lowercased()) {
+                    Section(header: Text("Developer Settings")) {
+                        Button("Enable Pro Features") {
+                            authManager.enableProFeatures()
+                        }
+                        .foregroundColor(.green)
+                        
+                        Button("Enable Pro for bumpinace@gmail.com") {
+                            authManager.enableProForEmail(email: "bumpinace@gmail.com")
+                        }
+                        .foregroundColor(.green)
+                        
+                        if authManager.isPro {
+                            Text("Pro features are enabled")
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
