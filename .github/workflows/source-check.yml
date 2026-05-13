@@ -1,0 +1,43 @@
+name: Source Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  source-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check tracked secret files
+        run: |
+          set -euo pipefail
+          matches="$(git ls-files | grep -E '(^|/)(\.env($|\.)|.*\.pem$|.*\.key$|GoogleService-Info\.plist$|Secrets\.plist$)' || true)"
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            exit 1
+          fi
+
+      - name: Check token patterns
+        run: |
+          set -euo pipefail
+          if git grep -nE 'sk-[A-Za-z0-9_-]{20,}|hf_[A-Za-z0-9]{20,}|[0-9]{8,10}:[A-Za-z0-9_-]{35,}|-----BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY-----'; then
+            exit 1
+          fi
+
+      - name: Check bundled provider keys are absent
+        run: |
+          set -euo pipefail
+          if git grep -nE '(defaultAPIKey|freeTierAPIKey)[[:space:]]*=' -- '*.swift'; then
+            exit 1
+          fi
