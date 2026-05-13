@@ -4,6 +4,8 @@
 
 ## User settings
 xcuserdata/
+*.xcuserstate
+DerivedData/
 
 ## Obj-C/Swift specific
 *.hmap
@@ -30,6 +32,20 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.local
+*.xcconfig
+*.p8
+*.p12
+*.pem
+*.key
+*.mobileprovision
+GoogleService-Info.plist
+Secrets.plist
 
 # CocoaPods
 #

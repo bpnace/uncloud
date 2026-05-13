@@ -14,12 +14,6 @@ enum ServiceError: Error {
 }
 
 class HuggingFaceService {
-    // Default API key that can be used by all users
-    private let defaultAPIKey = "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" // Replace with your actual API key
-    
-    // Free tier API key for anonymous users
-    private let freeTierAPIKey = "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" // Insert your Hugging Face free tier API key here
-    
     // Free tier models (smaller, efficient models suitable for the free tier)
     private let freeTierModels = [
         "google/gemma-2-2b-it",
@@ -36,10 +30,6 @@ class HuggingFaceService {
     private let baseURL = "https://api-inference.huggingface.co/models/"
     
     init() {
-        // Set the default API key initially to ensure we always have a key
-        self.apiKey = defaultAPIKey
-        
-        // Then check if there's a saved key
         if let savedKey = UserDefaults.standard.string(forKey: "huggingface_api_key"), !savedKey.isEmpty {
             self.apiKey = savedKey
         }
@@ -58,32 +48,19 @@ class HuggingFaceService {
             self.apiKey = trimmedKey
             UserDefaults.standard.set(trimmedKey, forKey: "huggingface_api_key")
         } else {
-            // If empty key is provided, fall back to default
-            useDefaultAPIKey()
+            self.apiKey = nil
+            UserDefaults.standard.removeObject(forKey: "huggingface_api_key")
         }
     }
     
-    // Use the default API key provided by the app
+    // Use the locally saved API key. Public builds must not ship shared provider tokens.
     func useDefaultAPIKey() {
-        self.apiKey = defaultAPIKey
-        // We don't save the default key to UserDefaults to avoid exposing it
-        #if DEBUG
-        // Only print in debug builds and only when the key actually changes
-        if self.apiKey != defaultAPIKey {
-            print("Using default HuggingFace API key")
-        }
-        #endif
+        self.apiKey = UserDefaults.standard.string(forKey: "huggingface_api_key")
     }
     
-    // Use the free tier API key for anonymous users
+    // Anonymous users must provide their own key or use a backend proxy.
     func useFreeTierAPIKey() {
-        self.apiKey = freeTierAPIKey
-        #if DEBUG
-        // Only print in debug builds and only when the key actually changes
-        if self.apiKey != freeTierAPIKey {
-            print("Using free tier HuggingFace API key")
-        }
-        #endif
+        self.apiKey = UserDefaults.standard.string(forKey: "huggingface_api_key")
     }
     
     // Set model and save to UserDefaults
@@ -101,17 +78,7 @@ class HuggingFaceService {
     func getTherapyResponse(for userInput: String) -> AnyPublisher<String, Error> {
         // Ensure we have an API key
         guard let apiKey = self.apiKey, !apiKey.isEmpty else {
-            print("Missing HuggingFace API key, falling back to default key")
-            // Try to use default key as a fallback
-            self.apiKey = defaultAPIKey
-            
-            // If we still don't have a key, return error
-            guard defaultAPIKey.count > 0 else {
-                return Fail(error: ServiceError.missingAPIKey).eraseToAnyPublisher()
-            }
-            
-            // Continue with default key
-            return getTherapyResponse(for: userInput)
+            return Fail(error: ServiceError.missingAPIKey).eraseToAnyPublisher()
         }
         
         // Construct request URL
